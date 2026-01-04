@@ -767,7 +767,7 @@ function closeConfirmModal() {
     modal.removeAttribute('role');
 }
 
-// === TELEGRAM БОТ (УЛУЧШЕННАЯ ЛОГИКА) ===
+// === TELEGRAM БОТ (УЛУЧШЕННАЯ ЛОГИКА ДЛЯ MINIAPP) ===
 async function openTelegramBot() {
     if (!selectedPainting) {
         showNotification('Сначала выберите картину', 'error');
@@ -778,7 +778,10 @@ async function openTelegramBot() {
         closeConfirmModal();
         showLoading('Подготовка заказа...');
         
-        // Проверяем доступность API
+        // Проверяем, находимся ли мы в Telegram MiniApp
+        const isTelegramMiniApp = window.Telegram && window.Telegram.WebView;
+        const isTelegramWebview = window.Telegram && window.Telegram.WebApp;
+        
         if (apiAvailable) {
             // Используем API для создания заказа
             const userId = localStorage.getItem('user_id') || `user_${Date.now()}`;
@@ -805,15 +808,27 @@ async function openTelegramBot() {
                 const url = `https://t.me/flexyframe_bot?start=${param}`;
                 
                 hideLoading();
-                showNotification('Заказ создан! Открываю Telegram...', 'success');
                 
-                // Открываем Telegram
-                window.open(url, '_blank');
-                
-                // Показываем инструкции
-                setTimeout(() => {
-                    showNotification(`Заказ #${data.order_id} готов к оплате`, 'success', 5000);
-                }, 1000);
+                // ВАЖНО: В MiniApp просто закрываем окно, Telegram сам откроет бота
+                if (isTelegramWebview) {
+                    showNotification('Заказ готов! Закрываю MiniApp...', 'success');
+                    
+                    // Показываем сообщение и закрываем через 1.5 секунды
+                    setTimeout(() => {
+                        // Закрываем MiniApp
+                        window.Telegram.WebApp.close();
+                    }, 1500);
+                    
+                } else {
+                    // В обычном браузере открываем Telegram
+                    showNotification('Заказ создан! Открываю Telegram...', 'success');
+                    window.open(url, '_blank');
+                    
+                    // Показываем инструкции
+                    setTimeout(() => {
+                        showNotification(`Заказ #${data.order_id} готов к оплате`, 'success', 5000);
+                    }, 1000);
+                }
                 
             } else {
                 throw new Error('API error');
@@ -824,8 +839,18 @@ async function openTelegramBot() {
             const url = `https://t.me/flexyframe_bot?start=${param}`;
             
             hideLoading();
-            showNotification('Открываю Telegram...', 'success');
-            window.open(url, '_blank');
+            
+            // ВАЖНО: В MiniApp просто закрываем окно
+            if (isTelegramWebview) {
+                showNotification('Заказ готов! Закрываю MiniApp...', 'success');
+                
+                setTimeout(() => {
+                    window.Telegram.WebApp.close();
+                }, 1500);
+            } else {
+                showNotification('Открываю Telegram...', 'success');
+                window.open(url, '_blank');
+            }
         }
         
         // Сбрасываем выбор
@@ -839,13 +864,17 @@ async function openTelegramBot() {
         hideLoading();
         handleError(error, 'Ошибка при создании заказа');
         
-        // Предлагаем ручной переход
-        setTimeout(() => {
-            if (confirm('Не удалось создать заказ автоматически. Перейти в Telegram вручную?')) {
-                const url = `https://t.me/flexyframe_bot`;
-                window.open(url, '_blank');
-            }
-        }, 1000);
+        // В MiniApp не предлагаем ручной переход
+        const isTelegramWebview = window.Telegram && window.Telegram.WebApp;
+        
+        if (!isTelegramWebview) {
+            setTimeout(() => {
+                if (confirm('Не удалось создать заказ автоматически. Перейти в Telegram вручную?')) {
+                    const url = `https://t.me/flexyframe_bot`;
+                    window.open(url, '_blank');
+                }
+            }, 1000);
+        }
     }
 }
 
